@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Games Collection</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .games-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 16px;
+            margin-top: 20px;
+        }
+        .game-card {
+            background-color: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 24px;
+            text-decoration: none;
+            color: inherit;
+            transition: border-color 0.2s ease;
+        }
+        .game-card:hover {
+            border-color: var(--accent-color);
+        }
+        .game-card h2 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+        .game-card p {
+            font-size: 0.85rem;
+            color: var(--text-sub);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container" style="max-width: 800px;">
+        <header>
+            <h1 class="tool-title">Games</h1>
+            <a href="/" class="back-link">戻る</a>
+        </header>
+
+        <main class="games-grid">
+            <a href="/tools/games/geometrydash.html" class="game-card">
+                <h2>Geometry Dash</h2>
+                <p>リズムに合わせて障害物を飛び越えるアクション</p>
+            </a>
+
+            <a href="/tools/games/2048.html" class="game-card">
+                <h2>2048</h2>
+                <p>数字のタイルを滑らせて2048を目指すパズル</p>
+            </a>
+
+            <a href="/tools/games/brawlstars.html" class="game-card">
+                <h2>Brawl Stars</h2>
+                <p>チームで戦うゲームだ。本家は僕もやってる</p>
+            </a>
+
+            <a href="/tools/games/minecraft.html" class="game-card">
+                <h2>Minecraft</h2>
+                <p>無限のブロック世界で建築とサバイバル</p>
+            </a>
+
+            <a href="/tools/games/tsumtsum.html" class="game-card">
+                <h2>つむつむ</h2>
+                <p>同じキャラクターを繋げて消していくパズル</p>
+            </a>
+        </main>
+    </div>
+
+</body>
+</html>
