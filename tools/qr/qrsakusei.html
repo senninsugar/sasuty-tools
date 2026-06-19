@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Code Generator</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        #qrImage {
+            max-width: 200px;
+            max-height: 200px;
+            border: 1px solid var(--border-color);
+            padding: 8px;
+            background: #fff;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1 class="tool-title">QR Code Generator</h1>
+            <a href="/" class="back-link">戻る</a>
+        </header>
+
+        <main class="main-panel">
+            <div class="form-group">
+                <label for="textInput">対象のURLまたはテキスト</label>
+                <input type="text" id="textInput" placeholder="https://example.com" autocomplete="off">
+            </div>
+
+            <div class="form-group" style="margin-top: 24px;">
+                <button id="generateBtn" class="btn">QRコードを生成</button>
+            </div>
+
+            <div id="resultArea" class="result-area hidden">
+                <img id="qrImage" src="" alt="Generated QR Code">
+            </div>
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const textInput = document.getElementById('textInput');
+            const generateBtn = document.getElementById('generateBtn');
+            const resultArea = document.getElementById('resultArea');
+            const qrImage = document.getElementById('qrImage');
+
+            generateBtn.addEventListener('click', () => {
+                const value = textInput.value.trim();
+                
+                if (!value) {
+                    alert('テキストを入力してください。');
+                    return;
+                }
+
+                const apiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(value)}`;
+                
+                qrImage.src = apiUrl;
+                resultArea.classList.remove('hidden');
+            });
+        });
+    </script>
+</body>
+</html>
