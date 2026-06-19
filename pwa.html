@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PWA Support</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .grid-inputs {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 16px;
+        }
+        .help-text {
+            font-size: 0.75rem;
+            color: var(--text-sub);
+            margin-top: 4px;
+        }
+        .icon-preview-area {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 8px;
+        }
+        .icon-preview {
+            width: 48px;
+            height: 48px;
+            border: 1px solid var(--border-color);
+            background-color: var(--bg-color);
+            object-fit: contain;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1 class="tool-title">PWA Support</h1>
+            <a href="/" class="back-link">戻る</a>
+        </header>
+
+        <main class="main-panel">
+            <div class="grid-inputs">
+                <div class="form-group">
+                    <label for="appName">アプリ名</label>
+                    <input type="text" id="appName" placeholder="My Tool App" autocomplete="off">
+                </div>
+
+                <div class="form-group">
+                    <label for="cacheFiles">キャッシュするファイル（カンマ区切り）</label>
+                    <input type="text" id="cacheFiles" placeholder="index.html, /static/ok.html, /static/css/style.css" autocomplete="off">
+                    <p class="help-text">オフライン時に利用可能にするHTMLやCSS、JSファイルのパスを入力してください。</p>
+                </div>
+
+                <div class="form-group">
+                    <label for="iconFile">アイコン画像</label>
+                    <input type="file" id="iconFile" accept="image/*">
+                    <div id="previewArea" class="icon-preview-area hidden">
+                        <img id="iconPreview" class="icon-preview" src="" alt="Preview">
+                        <span id="iconInfo" class="help-text"></span>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-top: 16px;">
+                    <button id="generateBtn" class="btn">PWA構成ファイルを生成</button>
+                </div>
+            </div>
+
+            <div id="resultArea" class="result-area hidden">
+                <div class="form-group" style="width: 100%; margin-bottom: 16px;">
+                    <button id="downloadManifest" class="btn" style="background-color: #222;">manifest.json を保存</button>
+                </div>
+                <div class="form-group" style="width: 100%;">
+                    <button id="downloadSW" class="btn" style="background-color: #222;">sw.js を保存</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const appNameInput = document.getElementById('appName');
+            const cacheFilesInput = document.getElementById('cacheFiles');
+            const iconFileInput = document.getElementById('iconFile');
+            const previewArea = document.getElementById('previewArea');
+            const iconPreview = document.getElementById('iconPreview');
+            const iconInfo = document.getElementById('iconInfo');
+            
+            const generateBtn = document.getElementById('generateBtn');
+            const resultArea = document.getElementById('resultArea');
+            const downloadManifestBtn = document.getElementById('downloadManifest');
+            const downloadSWBtn = document.getElementById('downloadSW');
+
+            let iconDataUrl = '/icon.png';
+            let iconName = 'icon.png';
+
+            iconFileInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    iconName = file.name;
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        iconDataUrl = event.target.result;
+                        iconPreview.src = iconDataUrl;
+                        iconInfo.textContent = `${file.name} (${file.type})`;
+                        previewArea.classList.remove('hidden');
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+
+            function downloadBlob(content, filename, contentType) {
+                const blob = new Blob([content], { type: contentType });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                a.click();
+                URL.revokeObjectURL(url);
+            }
+
+            generateBtn.addEventListener('click', () => {
+                const appName = appNameInput.value.trim() || 'Tools PWA';
+                const cacheInputValue = cacheFilesInput.value.trim();
+                
+                let fileList = ['/', 'index.html'];
+                if (cacheInputValue) {
+                    const customList = cacheInputValue.split(',').map(f => f.trim()).filter(f => f !== '');
+                    fileList = [...new Set([...fileList, ...customList])];
+                }
+
+                const manifestObj = {
+                    "short_name": appName,
+                    "name": appName,
+                    "icons": [
+                        {
+                            "src": iconName,
+                            "type": "image/png",
+                            "sizes": "192x192"
+                        },
+                        {
+                            "src": iconName,
+                            "type": "image/png",
+                            "sizes": "512x512"
+                        }
+                    ],
+                    "start_url": "/",
+                    "background_color": "#fafafa",
+                    "theme_color": "#000000",
+                    "display": "standalone",
+                    "orientation": "portrait"
+                };
+
+                const swContent = `const CACHE_NAME = '${appName.toLowerCase().replace(/\s+/g, '-')}-cache-v1';
+const ASSETS = ${JSON.stringify(fileList, null, 4)};
+
+self.addEventListener('install', (e) => {
+    e.waitUntil(
+        caches.open(CACHE_NAME).then((cache) => {
+            return cache.addAll(ASSETS);
+        })
+    );
+});
+
+self.addEventListener('activate', (e) => {
+    e.waitUntil(
+        caches.keys().then((keys) => {
+            return Promise.all(
+                keys.map((key) => {
+                    if (key !== CACHE_NAME) {
+                        return caches.delete(key);
+                    }
+                })
+            );
+        })
+    );
+});
+
+self.addEventListener('fetch', (e) => {
+    e.respondWith(
+        caches.match(e.request).then((response) => {
+            return response || fetch(e.request);
+        })
+    );
+});`;
+
+                downloadManifestBtn.onclick = () => {
+                    downloadBlob(JSON.stringify(manifestObj, null, 4), 'manifest.json', 'application/json');
+                };
+
+                downloadSWBtn.onclick = () => {
+                    downloadBlob(swContent, 'sw.js', 'application/javascript');
+                };
+
+                resultArea.classList.remove('hidden');
+            });
+        });
+    </script>
+</body>
+</html>
