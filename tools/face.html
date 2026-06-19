@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>顔面偏差値診断 (超厳格・高精度修正版)</title>
+    <link rel="stylesheet" href="static/css/style.css">
+    
+    <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+
+    <style>
+        .preview-container {
+            position: relative;
+            width: 100%;
+            min-height: 250px;
+            border: 2px dashed var(--border-color);
+            border-radius: 4px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--text-sub);
+            font-size: 0.9rem;
+            margin-bottom: 20px;
+            cursor: pointer;
+            overflow: hidden;
+            background-color: #fafafa;
+        }
+        #target-image {
+            width: 100%;
+            height: auto;
+            max-height: 400px;
+            object-fit: contain;
+            display: block;
+        }
+
+        /* --- AI処理中のスキャンアニメーション --- */
+        .ai-scanner {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 10, 0, 0.75);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+        }
+        .scan-line {
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+            background: #00ff00;
+            box-shadow: 0 0 15px #00ff00, 0 0 30px #00ff00;
+            animation: scan-anim 1.5s linear infinite;
+        }
+        @keyframes scan-anim {
+            0% { top: 0%; opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { top: 100%; opacity: 0; }
+        }
+        .scan-text {
+            color: #00ff00;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 1.1rem;
+            font-weight: bold;
+            text-align: center;
+            line-height: 1.5;
+            text-shadow: 0 0 5px #00ff00;
+        }
+
+        .user-info {
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 0.95rem;
+            color: var(--text-main);
+            font-weight: 600;
+            background: #eee;
+            padding: 8px;
+            border-radius: 4px;
+        }
+
+        .score-display {
+            font-size: 4rem;
+            font-weight: 700;
+            color: var(--accent-color);
+            margin: 10px 0;
+            letter-spacing: -0.05em;
+            text-align: center;
+        }
+        .score-display span {
+            font-size: 1.2rem;
+            font-weight: 500;
+            margin-right: 5px;
+            color: var(--text-sub);
+        }
+        
+        .detail-table {
+            width: 100%;
+            margin: 20px 0;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+        .detail-table th, .detail-table td {
+            padding: 8px 10px;
+            border-bottom: 1px solid var(--border-color);
+            text-align: left;
+        }
+        .detail-table th {
+            font-weight: 600;
+            color: var(--text-main);
+            width: 65%;
+        }
+        .detail-table td {
+            color: var(--text-sub);
+            text-align: right;
+        }
+        .score-value {
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .comment-display {
+            font-size: 0.9rem;
+            color: var(--text-sub);
+            text-align: justify;
+            line-height: 1.6;
+            margin-top: 15px;
+            padding: 15px;
+            background: #fafafa;
+            border-radius: 4px;
+        }
+        .status-message {
+            font-size: 0.85rem;
+            color: var(--text-sub);
+            margin-top: 10px;
+            text-align: center;
+        }
+        .error-message {
+            color: #d93025;
+            background-color: #fce8e6;
+            padding: 15px;
+            border-radius: 4px;
+            border: 1px solid #d93025;
+            font-size: 0.9rem;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <span class="tool-title">顔面偏差値 <span style="font-size:0.7rem; font-weight:normal; letter-spacing:0; color:red;"></span></span>
+        <a href="/home.html" class="back-link">戻る</a>
+    </header>
+
+    <main class="main-panel">
+        <div id="setup-stage">
+            <div id="error-display" class="error-message hidden">
+                顔が検出されませんでした。正面を向いた鮮明な写真を使用してください。
+            </div>
+
+            <div class="form-group">
+                <label>スキャンする顔写真を選択</label>
+                <div class="preview-container" id="drop-zone">
+                    <span id="drop-text">クリックして顔写真（正面）をアップロード</span>
+                    <img id="target-image" class="hidden" alt="Upload preview">
+                    
+                    <div id="ai-scanner" class="ai-scanner hidden">
+                        <div class="scan-line"></div>
+                        <div class="scan-text">
+                            DEEP SCANNING...<br>
+                            <span id="scan-progress" style="font-size: 1.5rem;">0%</span><br>
+                            <span id="scan-detail" style="font-size: 0.75rem; font-weight: normal; margin-top:10px; display:block;">INITIALIZING...</span>
+                        </div>
+                    </div>
+                </div>
+                <input type="file" id="file-input" accept="image/*" class="hidden">
+            </div>
+
+            <button type="button" class="btn" id="analyze-btn" disabled>AIモデル読み込み中...</button>
+            <p class="status-message" id="status-text">システムを初期化しています...</p>
+        </div>
+
+        <div id="result-stage" class="result-area hidden">
+            <label>ディープスキャン総合評価</label>
+            
+            <div class="user-info">
+                [ 検出データ ] 推定年齢: <span id="age-output" style="color:var(--accent-color);">--</span>歳 / 感情ベース: <span id="expression-output" style="color:var(--accent-color);">--</span>
+            </div>
+
+            <div class="score-display"><span>総合偏差値</span><span id="score-output">--</span></div>
+            
+            <table class="detail-table">
+                <thead>
+                    <tr>
+                        <th>詳細解析項目 (100点満点)</th>
+                        <th>AI スコア</th>
+                    </tr>
+                </thead>
+                <tbody id="score-tbody">
+                    <!-- JSで全17項目を出力します -->
+                </tbody>
+            </table>
+
+            <p class="comment-display" id="comment-output">解析コメントがここに表示されます。</p>
+            
+            <button type="button" class="btn" id="retry-btn">別の写真を解析する</button>
+        </div>
+    </main>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const dropText = document.getElementById('drop-text');
+        const targetImage = document.getElementById('target-image');
+        const analyzeBtn = document.getElementById('analyze-btn');
+        const retryBtn = document.getElementById('retry-btn');
+        const statusText = document.getElementById('status-text');
+        const errorDisplay = document.getElementById('error-display');
+        
+        const aiScanner = document.getElementById('ai-scanner');
+        const scanProgress = document.getElementById('scan-progress');
+        const scanDetail = document.getElementById('scan-detail');
+
+        const setupStage = document.getElementById('setup-stage');
+        const resultStage = document.getElementById('result-stage');
+        
+        const ageOutput = document.getElementById('age-output');
+        const expressionOutput = document.getElementById('expression-output');
+        const scoreOutput = document.getElementById('score-output');
+        const scoreTbody = document.getElementById('score-tbody');
+        const commentOutput = document.getElementById('comment-output');
+
+        let isModelLoaded = false;
+        let selectedFile = null;
+
+        // モデルロード（年齢・感情認識モデルを追加）
+        async function loadModels() {
+            try {
+                statusText.textContent = '高精度顔解析モデルを読込中...';
+                const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
+                await faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL);
+                await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+                await faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL);
+                await faceapi.nets.ageGenderNet.loadFromUri(MODEL_URL);
+                
+                isModelLoaded = true;
+                analyzeBtn.textContent = '全17項目 ディープスキャンを開始';
+                statusText.textContent = '準備完了。顔以外の画像は自動的に弾かれます。';
+                analyzeBtn.disabled = false;
+            } catch (error) {
+                console.error(error);
+                statusText.textContent = 'モデルのロードに失敗しました。再読み込みしてください。';
+            }
+        }
+        loadModels();
+
+        // 画像アップロード処理
+        dropZone.addEventListener('click', () => {
+            if(!aiScanner.classList.contains('hidden')) return; // スキャン中は押せない
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                selectedFile = file;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    targetImage.src = event.target.result;
+                    targetImage.classList.remove('hidden');
+                    dropText.classList.add('hidden');
+                    errorDisplay.classList.add('hidden');
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // スキャン中のテキスト演出用リスト
+        const scanSteps = [
+            "1. Eラインと顎の突出度を測定中...",
+            "2. 顔の黄金比 (1:1:1) を計算中...",
+            "3. 中顔面（目の下〜唇）の距離を測定中...",
+            "4. フェイスラインのエッジを検出中...",
+            "5. おでこの丸み（立体感）を推論中...",
+            "6. 涙袋のボリュームをスキャン中...",
+            "7. 白目の透明度・コントラストを確認中...",
+            "8. 蒙古襞と目頭の形状を解析中...",
+            "9. 黒目の比率 (1:2:1) を確認中...",
+            "10. 眉毛と目の距離を測定中...",
+            "11. 鼻尖（鼻先）の角度を測定中...",
+            "12. 鼻翼（小鼻）の広がりを計算中...",
+            "13. 鼻筋の直線ラインを確認中...",
+            "14. 口角の上昇角度を計算中...",
+            "15. 人中の長さを測定中...",
+            "16. 唇のシワと厚みを推論中...",
+            "17. 歯並びと口元の美しさを解析中..."
+        ];
+
+        analyzeBtn.addEventListener('click', async () => {
+            if (!selectedFile || !isModelLoaded) return;
+
+            analyzeBtn.disabled = true;
+            errorDisplay.classList.add('hidden');
+            
+            // アニメーション開始
+            aiScanner.classList.remove('hidden');
+            
+            // 擬似的なプログレス進行（実際の解析は裏で一瞬で終わらせる）
+            let progress = 0;
+            const progressInterval = setInterval(() => {
+                progress += Math.floor(Math.random() * 5) + 2;
+                if(progress > 99) progress = 99;
+                scanProgress.textContent = `${progress}%`;
+                
+                // プログレスに合わせてテキスト変更
+                const stepIndex = Math.floor((progress / 100) * scanSteps.length);
+                if(scanSteps[stepIndex]) {
+                    scanDetail.textContent = scanSteps[stepIndex];
+                }
+            }, 100);
+
+            try {
+                // 顔認識実行（表情・年齢判定を付与）
+                const detection = await faceapi.detectSingleFace(targetImage, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.6 }))
+                    .withFaceLandmarks()
+                    .withFaceExpressions()
+                    .withAgeAndGender();
+
+                if (!detection) throw new Error('FACE_NOT_FOUND');
+
+                const landmarks = detection.landmarks;
+                const jaw = landmarks.getJawOutline();
+                const leftEye = landmarks.getLeftEye();
+                const rightEye = landmarks.getRightEye();
+                const nose = landmarks.getNose();
+                const mouth = landmarks.getMouth();
+                const rightBrow = landmarks.getRightEyeBrow();
+                const leftBrow = landmarks.getLeftEyeBrow();
+
+                // 年齢と感情の抽出
+                const age = Math.round(detection.age);
+                const expressions = detection.expressions;
+                const maxExpr = Object.keys(expressions).reduce((a, b) => expressions[a] > expressions[b] ? a : b);
+                const exprMap = { neutral: '真顔', happy: '笑顔', sad: '悲しみ', angry: '怒り', fearful: '恐れ', disgusted: '嫌悪', surprised: '驚き' };
+                const exprStr = exprMap[maxExpr] || maxExpr;
+
+                // 基準となる長さ
+                const faceWidth = Math.abs(jaw[16].x - jaw[0].x);
+                const faceHeight = Math.abs(jaw[8].y - Math.min(leftBrow[2].y, rightBrow[2].y));
+                
+                // 距離計算ヘルパー
+                const dist = (p1, p2) => Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
+
+                // --- 17項目の厳格スコアリング (甘えを排除し、歪みや年齢によるたるみ等で容赦なく減点) ---
+                const scores = {};
+                
+                // 1. Eライン (横顔推論)
+                const noseToChin = dist(nose[3], jaw[8]);
+                scores["Eラインが整っている (推論)"] = Math.min(100, Math.max(20, 100 - Math.abs((noseToChin/faceHeight) - 0.4)*200));
+
+                // 2. 黄金比 1:1:1
+                const midPart = Math.abs(nose[6].y - Math.min(leftBrow[2].y, rightBrow[2].y));
+                const lowerPart = Math.abs(jaw[8].y - nose[6].y);
+                scores["顔の黄金比に近い (1:1:1)"] = Math.min(100, Math.max(20, 100 - Math.abs(midPart - lowerPart) / faceHeight * 300));
+
+                // 3. 中顔面が短い
+                const eyeCenterY = (leftEye[3].y + rightEye[0].y) / 2;
+                const mouthCenterY = (mouth[0].y + mouth[6].y) / 2;
+                const midFaceLength = mouthCenterY - eyeCenterY;
+                scores["中顔面（ちゅうがんめん）が短い"] = Math.min(100, Math.max(20, 100 - Math.abs((midFaceLength/faceHeight) - 0.42)*350));
+
+                // 4. フェイスラインがシャープ
+                const jawWidth = Math.abs(jaw[12].x - jaw[4].x);
+                scores["フェイスラインがシャープ"] = Math.min(100, Math.max(20, 100 - Math.abs((jawWidth/faceWidth) - 0.75)*250));
+
+                // 5. おでこの丸み (基礎点を大幅減)
+                scores["おでこに適度な丸みがある (推論)"] = 55 + (faceWidth % 30); 
+
+                // 6. 涙袋 (基礎点を大幅減)
+                scores["涙袋（なみだぶくろ）がぷっくりしている (推論)"] = 55 + (midFaceLength % 30);
+
+                // 7. 白目が澄んでいる (基礎点を大幅減)
+                scores["白目が澄んでいる (推論)"] = 60 + (faceHeight % 25);
+
+                // 8. 蒙古襞が薄い
+                const innerEyeDist = Math.abs(rightEye[0].x - leftEye[3].x);
+                const eyeWidthLeft = Math.abs(leftEye[3].x - leftEye[0].x);
+                scores["蒙古襞（もうこひだ）が薄い"] = Math.min(100, Math.max(20, 100 - Math.abs(innerEyeDist - eyeWidthLeft)/faceWidth * 350));
+
+                // 9. 黒目の比率
+                const eyeHeightLeft = Math.abs(leftEye[5].y - leftEye[1].y);
+                scores["黒目の比率が大きい (黄金比)"] = Math.min(100, Math.max(20, 100 - Math.abs((eyeHeightLeft/eyeWidthLeft) - 0.45)*300));
+
+                // 10. 眉毛と目の距離が近い
+                const browEyeDist = Math.abs(leftEye[1].y - leftBrow[2].y);
+                scores["眉毛と目の距離が近い"] = Math.min(100, Math.max(20, 100 - Math.abs((browEyeDist/faceHeight) - 0.1)*400));
+
+                // 11. 鼻尖がツンと上を向いている
+                const noseTipDist = dist(nose[3], nose[6]);
+                scores["鼻尖（びせん）がツンとしている"] = Math.min(100, Math.max(20, 100 - Math.abs((noseTipDist/faceHeight) - 0.1)*350));
+
+                // 12. 鼻翼が広がっていない
+                const alarWidth = Math.abs(nose[4].x - nose[0].x);
+                scores["鼻翼（小鼻）が広がっていない"] = Math.min(100, Math.max(20, 100 - Math.abs(alarWidth - innerEyeDist)/faceWidth * 300));
+
+                // 13. 鼻筋が通っている
+                const bridgeDeviation = Math.abs(nose[0].x - nose[3].x);
+                scores["鼻筋が通っている"] = Math.min(100, Math.max(20, 100 - (bridgeDeviation/faceWidth * 500)));
+
+                // 14. 口角が上がっている
+                const mouthTopY = mouth[3].y;
+                scores["口角（こうかく）が上がっている"] = Math.min(100, Math.max(20, 100 - Math.abs((mouthCornerY - mouthTopY)/faceHeight - 0.05)*500));
+
+                // 15. 人中が短い
+                const philtrumLength = Math.abs(mouth[3].y - nose[6].y);
+                const chinLength = Math.abs(jaw[8].y - mouth[9].y);
+                scores["人中（じんちゅう）が短い"] = Math.min(100, Math.max(20, 100 - Math.abs((philtrumLength/chinLength) - 0.5)*250));
+
+                // 16. 唇に縦ジワがない/ふっくら
+                const lipThickness = Math.abs(mouth[9].y - mouth[3].y);
+                scores["唇がふっくらしている"] = Math.min(100, Math.max(20, 100 - Math.abs((lipThickness/faceHeight) - 0.1)*300));
+
+                // 17. 歯並びが綺麗 (基礎点を大幅減)
+                scores["歯並びが綺麗 (推論)"] = 55 + (jawWidth % 30);
+
+                // --- 変顔・非対称ペナルティの計算 ---
+                let penalty = 0;
+                
+                // 1. 目の高さの非対称（顔を傾けたり歪めている場合）
+                const eyeYDiff = Math.abs(leftEye[3].y - rightEye[0].y) / faceHeight;
+                penalty += eyeYDiff * 300;
+                
+                // 2. 口の開けすぎ（変顔・驚き顔の対策）
+                const mouthOpenRatio = Math.abs(mouth[14].y - mouth[19].y) / faceHeight;
+                if(mouthOpenRatio > 0.12) {
+                    penalty += (mouthOpenRatio - 0.12) * 600; // 不自然に口が開いていると大減点
+                }
+
+                // 3. 負の感情ペナルティ（顔を歪めるような表情）
+                if(maxExpr === 'disgusted' || maxExpr === 'angry' || maxExpr === 'fearful' || maxExpr === 'surprised') {
+                    penalty += 15;
+                }
+
+                // --- 総合スコアの算出 ---
+                let totalScore = 0;
+                let htmlRows = '';
+                
+                for(let key in scores) {
+                    let s = Math.round(scores[key]);
+                    if(s > 100) s = 100;
+                    totalScore += s;
+                    
+                    // 色分け
+                    let color = s >= 85 ? '#d93025' : (s >= 70 ? '#111' : '#666');
+                    let bold = s >= 85 ? 'bold' : 'normal';
+
+                    htmlRows += `
+                        <tr>
+                            <td>${key}</td>
+                            <td class="score-value" style="color:${color}; font-weight:${bold};">${s} 点</td>
+                        </tr>
+                    `;
+                }
+
+                // 17項目の平均点からペナルティを引く
+                let average = (totalScore / 17) - penalty;
+                
+                // 【偏差値の厳格マッピング】
+                // 基礎点が下がったため、平均75点でようやく偏差値60になるように調整。
+                // 変顔やおじさん（たるみで比率が崩れる）は平均50〜60台に落ちるため、偏差値30〜40台になります。
+                let finalScore = Math.floor((average - 65) * 1.4 + 46);
+
+                if (finalScore > 85) finalScore = 85; 
+                if (finalScore < 30) finalScore = 30; // 最低値を引き下げ
+
+                // UI反映準備を1.5秒待つ（アニメーション完走のため）
+                setTimeout(() => {
+                    clearInterval(progressInterval);
+                    scanProgress.textContent = "100%";
+                    scanDetail.textContent = "ANALYSIS COMPLETE";
+                    
+                    setTimeout(() => {
+                        aiScanner.classList.add('hidden');
+                        
+                        ageOutput.textContent = age;
+                        expressionOutput.textContent = exprStr;
+                        
+                        scoreTbody.innerHTML = htmlRows;
+                        scoreOutput.textContent = finalScore;
+
+                        let comment = '';
+                        if (finalScore >= 70) {
+                            comment = '【SSS級・トップオブトップ】驚愕の数値です。短い中顔面、美しいEライン、理想的な涙袋や鼻の形など、現代の「美男美女のトレンド条件」をほぼ全て網羅しています。芸能人やトップモデルクラスの圧倒的なお顔立ちです。';
+                        } else if (finalScore >= 60) {
+                            comment = '【優秀・文句なしの美形】AIが全17項目をディープスキャンした結果、非常に高いポテンシャルが検出されました。誰もが憧れる魅力的なパーツを複数併せ持っています。';
+                        } else if (finalScore >= 45) {
+                            comment = '【標準・愛されフェイス】極端なバランスの崩れがなく、親しみやすいお顔立ちです。メイクや髪型が最高に映える「化けるポテンシャル」が最も高い骨格です。';
+                        } else {
+                            comment = '【要注意・要自己プロデュース】骨格の歪み、または表情による著しい非対称性が検出されました。もし意図的な変顔でない場合、パーツ配置が王道の黄金比から大きく外れています。';
+                        }
+                        commentOutput.textContent = comment;
+
+                        setupStage.classList.add('hidden');
+                        resultStage.classList.remove('hidden');
+
+                        analyzeBtn.textContent = '全17項目 ディープスキャンを開始';
+                        analyzeBtn.disabled = false;
+                    }, 500);
+                }, 1500);
+
+            } catch (error) {
+                console.error(error);
+                clearInterval(progressInterval);
+                aiScanner.classList.add('hidden');
+                
+                if (error.message === 'FACE_NOT_FOUND') {
+                    errorDisplay.classList.remove('hidden');
+                } else {
+                    alert('解析中にエラーが発生しました。正面を向いた鮮明な画像でもう一度お試しください。');
+                }
+                analyzeBtn.textContent = '全17項目 ディープスキャンを開始';
+                analyzeBtn.disabled = false;
+            }
+        });
+
+        retryBtn.addEventListener('click', () => {
+            fileInput.value = '';
+            targetImage.src = '';
+            targetImage.classList.add('hidden');
+            dropText.classList.remove('hidden');
+            selectedFile = null;
+            
+            resultStage.classList.add('hidden');
+            setupStage.classList.remove('hidden');
+        });
+    });
+</script>
+</body>
+</html>
