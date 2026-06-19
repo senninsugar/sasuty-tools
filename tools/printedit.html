@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Print Editor</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .editor-layout {
+            display: grid;
+            grid-template-columns: 240px 1fr;
+            gap: 24px;
+            margin-top: 20px;
+        }
+        .sidebar {
+            background-color: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 20px;
+            height: fit-content;
+        }
+        .preview-viewport {
+            background-color: #e0e0e0;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 40px 20px;
+            overflow-x: auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 500px;
+        }
+        .print-canvas-container {
+            background-color: #ffffff;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            display: grid;
+            gap: 0;
+            position: relative;
+            transform-origin: center center;
+            transition: transform 0.2s ease;
+        }
+        .print-canvas-container canvas {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background: #fff;
+        }
+        .select-input {
+            width: 100%;
+            background-color: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 8px 10px;
+            font-size: 0.85rem;
+            color: var(--text-main);
+            outline: none;
+        }
+        .range-value {
+            font-size: 0.8rem;
+            color: var(--text-sub);
+            float: right;
+        }
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #printArea, #printArea * {
+                visibility: visible;
+            }
+            #printArea {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100% !important;
+                height: 100% !important;
+                transform: none !important;
+                box-shadow: none !important;
+            }
+            @page {
+                size: auto;
+                margin: 0;
+            }
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+</head>
+<body>
+
+    <div class="container" style="max-width: 1100px; padding: 30px 20px;">
+        <header>
+            <h1 class="tool-title">Print Editor</h1>
+            <a href="/" class="back-link">戻る</a>
+        </header>
+
+        <div class="editor-layout">
+            <aside class="sidebar">
+                <div class="form-group">
+                    <label for="pdfFile">PDFファイルを選択</label>
+                    <input type="file" id="pdfFile" accept=".pdf" style="font-size: 0.8rem; width: 100%;">
+                </div>
+
+                <div class="form-group">
+                    <label for="paperSize">出力用紙サイズ</label>
+                    <select id="paperSize" class="select-input">
+                        <option value="a3">A3 (297 x 420 mm)</option>
+                        <option value="b4">B4 (257 x 364 mm)</option>
+                        <option value="a4" selected>A4 (210 x 297 mm)</option>
+                        <option value="b5">B5 (182 x 257 mm)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="layoutMode">ページ配置</label>
+                    <select id="layoutMode" class="select-input">
+                        <option value="single" selected>通常 (1ページ/枚)</option>
+                        <option value="2up">2枚を1枚にまとめる (見開き)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="zoomRange">表示サイズ変更 <span id="zoomVal" class="range-value">100%</span></label>
+                    <input type="range" id="zoomRange" min="50" max="150" value="100" style="width: 100%;">
+                </div>
+
+                <div class="form-group" style="margin-top: 30px;">
+                    <button id="printBtn" class="btn">印刷 / PDFとして保存</button>
+                </div>
+            </aside>
+
+            <main class="preview-viewport">
+                <div id="printArea" class="print-canvas-container">
+                    <div style="color: var(--text-sub); font-size: 0.9rem; padding: 20px;" id="placeholderText">
+                        PDFファイルを読み込んでください
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const pdfFileInput = document.getElementById('pdfFile');
+            const paperSizeSelect = document.getElementById('paperSize');
+            const layoutModeSelect = document.getElementById('layoutMode');
+            const zoomRange = document.getElementById('zoomRange');
+            const zoomVal = document.getElementById('zoomVal');
+            const printBtn = document.getElementById('printBtn');
+            const printArea = document.getElementById('printArea');
+            const placeholderText = document.getElementById('placeholderText');
+
+            let currentPdf = null;
+
+            const paperDimensions = {
+                a3: { width: 1191, height: 1684 },
+                b4: { width: 1031, height: 1461 },
+                a4: { width: 842, height: 1191 },
+                b5: { width: 728, height: 1031 }
+            };
+
+            function applyLayoutSettings() {
+                const size = paperSizeSelect.value;
+                const mode = layoutModeSelect.value;
+                const dims = paperDimensions[size];
+
+                if (mode === '2up') {
+                    printArea.style.width = `${dims.height}px`;
+                    printArea.style.height = `${dims.width}px`;
+                    printArea.style.gridTemplateColumns = '1fr 1fr';
+                } else {
+                    printArea.style.width = `${dims.width}px`;
+                    printArea.style.height = `${dims.height}px`;
+                    printArea.style.gridTemplateColumns = '1fr';
+                }
+                
+                const scale = zoomRange.value / 100;
+                printArea.style.transform = `scale(${scale})`;
+            }
+
+            async function renderPdfPages() {
+                if (!currentPdf) return;
+                
+                placeholderText.style.display = 'none';
+                const mode = layoutModeSelect.value;
+                const maxPages = mode === '2up' ? Math.min(2, currentPdf.numPages) : 1;
+
+                const canvases = printArea.querySelectorAll('canvas');
+                canvases.forEach(c => c.remove());
+
+                for (let i = 1; i <= maxPages; i++) {
+                    const page = await currentPdf.getPage(i);
+                    const canvas = document.createElement('canvas');
+                    printArea.appendChild(canvas);
+
+                    const context = canvas.getContext('2d');
+                    const viewport = page.getViewport({ scale: 2.0 });
+
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+
+                    const renderContext = {
+                        canvasContext: context,
+                        viewport: viewport
+                    };
+                    await page.render(renderContext).promise;
+                }
+            }
+
+            pdfFileInput.addEventListener('change', async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const fileReader = new FileReader();
+                fileReader.onload = async function() {
+                    const typedarray = new Uint8Array(this.result);
+                    try {
+                        currentPdf = await pdfjsLib.getDocument(typedarray).promise;
+                        applyLayoutSettings();
+                        await renderPdfPages();
+                    } catch (error) {
+                        alert('PDFの読み込みに失敗しました。');
+                    }
+                };
+                fileReader.readAsArrayBuffer(file);
+            });
+
+            paperSizeSelect.addEventListener('change', () => {
+                applyLayoutSettings();
+            });
+
+            layoutModeSelect.addEventListener('change', async () => {
+                applyLayoutSettings();
+                await renderPdfPages();
+            });
+
+            zoomRange.addEventListener('input', (e) => {
+                zoomVal.textContent = `${e.target.value}%`;
+                applyLayoutSettings();
+            });
+
+            printBtn.addEventListener('click', () => {
+                if (!currentPdf) {
+                    alert('印刷するPDFファイルが読み込まれていません。');
+                    return;
+                }
+                window.print();
+            });
+        });
+    </script>
+</body>
+</html>
