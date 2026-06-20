@@ -30,6 +30,93 @@
             object-fit: contain;
             border-radius: 4px;
         }
+        .html-file-item {
+            border: 1px dashed var(--border-color);
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 12px;
+            position: relative;
+        }
+        .html-file-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .remove-html-btn {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            font-size: 0.75rem;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .add-html-btn {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 8px;
+        }
+        .preview-box {
+            margin-top: 16px;
+            border: 1px solid var(--border-color);
+            padding: 12px;
+            border-radius: 6px;
+            background-color: #1e1e1e;
+            color: #fff;
+        }
+        .preview-title-area {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+        .preview-title {
+            font-weight: bold;
+            font-size: 0.9rem;
+            color: #00adb5;
+        }
+        .copy-btn {
+            background-color: #444;
+            color: #fff;
+            border: none;
+            padding: 4px 8px;
+            font-size: 0.75rem;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .copy-btn:hover {
+            background-color: #555;
+        }
+        .preview-textarea {
+            width: 100%;
+            background-color: #2d2d2d;
+            color: #f8f8f2;
+            font-family: monospace;
+            font-size: 0.85rem;
+            border: 1px solid #444;
+            box-sizing: border-box;
+            resize: vertical;
+        }
+        .structure-tree {
+            background-color: #1a1a1a;
+            color: #a9ffb6;
+            font-family: monospace;
+            padding: 16px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            white-space: pre-wrap;
+            line-height: 1.4;
+            margin-top: 8px;
+        }
+        .hidden {
+            display: none !important;
+        }
     </style>
 </head>
 <body>
@@ -48,12 +135,6 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="cacheFiles">キャッシュするファイル（カンマ区切り）</label>
-                    <input type="text" id="cacheFiles" placeholder="index.html, /static/ok.html, /static/css/style.css" autocomplete="off">
-                    <p class="help-text">オフライン時に利用可能にするHTMLやCSS、JSファイルのパスを入力してください。</p>
-                </div>
-
-                <div class="form-group">
                     <label for="iconFile">アイコン画像</label>
                     <input type="file" id="iconFile" accept="image/*">
                     <div id="previewArea" class="icon-preview-area hidden">
@@ -62,17 +143,48 @@
                     </div>
                 </div>
 
+                <div class="form-group">
+                    <label>組み込み対象のHTMLファイル構成</label>
+                    <p class="help-text" style="margin-bottom: 8px;">アプリに必要なHTMLファイルを定義してください。ファイルパスがそのままキャッシュ対象になります（例: /index.html, /static/ok.html）</p>
+                    
+                    <div id="htmlFilesContainer">
+                        <div class="html-file-item">
+                            <div class="html-file-header">
+                                <div style="display: flex; gap: 8px; align-items: center; width: 80%;">
+                                    <span style="font-size: 0.85rem; font-weight: bold; white-space: nowrap;">パス:</span>
+                                    <input type="text" class="html-path-input" placeholder="/index.html" value="/index.html" autocomplete="off" style="width: 100%;">
+                                </div>
+                                <span style="font-size: 0.75rem; color: var(--text-sub);">メイン</span>
+                            </div>
+                            <input type="file" class="html-file-picker" accept=".html,.htm" style="margin-bottom: 6px; font-size: 0.8rem;">
+                            <textarea class="html-code-textarea" placeholder="<!DOCTYPE html>&#10;&lt;html&gt;&#10;&lt;head&gt;&lt;title&gt;Sample&lt;/title&gt;&lt;/head&gt;&#10;&lt;body&gt;&lt;h1&gt;Hello World&lt;/h1&gt;&lt;/body&gt;&#10;&lt;/html&gt;" rows="6" style="width: 100%; font-family: monospace; box-sizing: border-box;"></textarea>
+                        </div>
+                    </div>
+                    
+                    <button type="button" id="addHtmlBtn" class="add-html-btn">＋ HTMLファイルを追加</button>
+                </div>
+
                 <div class="form-group" style="margin-top: 16px;">
                     <button id="generateBtn" class="btn">PWA構成ファイルを生成</button>
                 </div>
             </div>
 
             <div id="resultArea" class="result-area hidden">
-                <div class="form-group" style="width: 100%; margin-bottom: 16px;">
+                <h2 style="font-size: 1.2rem; margin-top: 24px; margin-bottom: 8px; border-bottom: 2px solid var(--border-color); padding-bottom: 4px;">生成された展開ファイル構成</h2>
+                <div id="fileStructureTree" class="structure-tree"></div>
+
+                <h2 style="font-size: 1.2rem; margin-top: 24px; margin-bottom: 8px; border-bottom: 2px solid var(--border-color); padding-bottom: 4px;">生成された構成ファイルのプレビュー（コピペ可能）</h2>
+                <div id="textPreviewsContainer"></div>
+
+                <h2 style="font-size: 1.2rem; margin-top: 24px; margin-bottom: 8px; border-bottom: 2px solid var(--border-color); padding-bottom: 4px;">ファイルの保存・一括ダウンロード</h2>
+                <div class="form-group" style="width: 100%; margin-bottom: 16px; margin-top: 12px;">
                     <button id="downloadManifest" class="btn" style="background-color: #222;">manifest.json を保存</button>
                 </div>
-                <div class="form-group" style="width: 100%;">
+                <div class="form-group" style="width: 100%; margin-bottom: 16px;">
                     <button id="downloadSW" class="btn" style="background-color: #222;">sw.js を保存</button>
+                </div>
+                <div class="form-group" style="width: 100%;">
+                    <button id="downloadZipBtn" class="btn" style="background-color: #0056b3;">PWAパッケージ (ZIP) をダウンロード</button>
                 </div>
             </div>
         </main>
@@ -81,30 +193,92 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const appNameInput = document.getElementById('appName');
-            const cacheFilesInput = document.getElementById('cacheFiles');
             const iconFileInput = document.getElementById('iconFile');
             const previewArea = document.getElementById('previewArea');
             const iconPreview = document.getElementById('iconPreview');
             const iconInfo = document.getElementById('iconInfo');
             
+            const htmlFilesContainer = document.getElementById('htmlFilesContainer');
+            const addHtmlBtn = document.getElementById('addHtmlBtn');
+
             const generateBtn = document.getElementById('generateBtn');
             const resultArea = document.getElementById('resultArea');
+            const fileStructureTree = document.getElementById('fileStructureTree');
+            const textPreviewsContainer = document.getElementById('textPreviewsContainer');
             const downloadManifestBtn = document.getElementById('downloadManifest');
             const downloadSWBtn = document.getElementById('downloadSW');
+            const downloadZipBtn = document.getElementById('downloadZipBtn');
 
-            let iconDataUrl = '/icon.png';
-            let iconName = 'icon.png';
+            let iconDataUrl = null;
+            let originalImageElement = null;
+
+            // キャッシュ用、およびZIPダウンロード用の一時オブジェクト
+            let currentManifestObj = null;
+            let currentSwContent = "";
+            let currentProcessedHtmls = []; // { name, path, content } 
+
+            function setupHtmlItemEvents(item) {
+                const filePicker = item.querySelector('.html-file-picker');
+                const pathInput = item.querySelector('.html-path-input');
+                const textarea = item.querySelector('.html-code-textarea');
+                const removeBtn = item.querySelector('.remove-html-btn');
+
+                filePicker.addEventListener('change', (e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                        if (!pathInput.value || pathInput.value === '/index.html') {
+                            pathInput.value = '/' + file.name;
+                        }
+                        const reader = new FileReader();
+                        reader.onload = function(event) {
+                            textarea.value = event.target.result;
+                        };
+                        reader.readAsText(file, 'UTF-8');
+                    }
+                });
+
+                if (removeBtn) {
+                    removeBtn.addEventListener('click', () => {
+                        item.remove();
+                    });
+                }
+            }
+
+            setupHtmlItemEvents(htmlFilesContainer.querySelector('.html-file-item'));
+
+            addHtmlBtn.addEventListener('click', () => {
+                const newItem = document.createElement('div');
+                newItem.className = 'html-file-item';
+                newItem.innerHTML = `
+                    <div class="html-file-header">
+                        <div style="display: flex; gap: 8px; align-items: center; width: 80%;">
+                            <span style="font-size: 0.85rem; font-weight: bold; white-space: nowrap;">パス:</span>
+                            <input type="text" class="html-path-input" placeholder="/static/page.html" autocomplete="off" style="width: 100%;">
+                        </div>
+                        <button type="button" class="remove-html-btn">削除</button>
+                    </div>
+                    <input type="file" class="html-file-picker" accept=".html,.htm" style="margin-bottom: 6px; font-size: 0.8rem;">
+                    <textarea class="html-code-textarea" placeholder="&lt;!DOCTYPE html&gt;&#10;&lt;html&gt;&#10;&lt;head&gt;&lt;title&gt;Sub Page&lt;/title&gt;&lt;/head&gt;&#10;&lt;body&gt;&lt;p&gt;Content here&lt;/p&gt;&lt;/body&gt;&#10;&lt;/html&gt;" rows="6" style="width: 100%; font-family: monospace; box-sizing: border-box;"></textarea>
+                `;
+                htmlFilesContainer.appendChild(newItem);
+                setupHtmlItemEvents(newItem);
+            });
 
             iconFileInput.addEventListener('change', (e) => {
                 const file = e.target.files[0];
                 if (file) {
-                    iconName = file.name;
                     const reader = new FileReader();
                     reader.onload = function(event) {
                         iconDataUrl = event.target.result;
                         iconPreview.src = iconDataUrl;
                         iconInfo.textContent = `${file.name} (${file.type})`;
                         previewArea.classList.remove('hidden');
+
+                        const img = new Image();
+                        img.src = iconDataUrl;
+                        img.onload = () => {
+                            originalImageElement = img;
+                        };
                     };
                     reader.readAsDataURL(file);
                 }
@@ -120,39 +294,201 @@
                 URL.revokeObjectURL(url);
             }
 
-            generateBtn.addEventListener('click', () => {
-                const appName = appNameInput.value.trim() || 'Tools PWA';
-                const cacheInputValue = cacheFilesInput.value.trim();
-                
-                let fileList = ['/', 'index.html'];
-                if (cacheInputValue) {
-                    const customList = cacheInputValue.split(',').map(f => f.trim()).filter(f => f !== '');
-                    fileList = [...new Set([...fileList, ...customList])];
+            function resizeIcon(img, size) {
+                return new Promise((resolve) => {
+                    if (!img) {
+                        resolve(null);
+                        return;
+                    }
+                    const canvas = document.createElement('canvas');
+                    canvas.width = size;
+                    canvas.height = size;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, size, size);
+                    canvas.toBlob((blob) => {
+                        resolve(blob);
+                    }, 'image/png');
+                });
+            }
+
+            async function createZip(files) {
+                const encoder = new TextEncoder();
+                let entries = [];
+                let offset = 0;
+                let localHeaders = [];
+
+                for (const file of files) {
+                    const nameBytes = encoder.encode(file.name);
+                    let dataBytes;
+                    if (file.content instanceof Blob) {
+                        dataBytes = new Uint8Array(await file.content.arrayBuffer());
+                    } else {
+                        dataBytes = encoder.encode(file.content);
+                    }
+
+                    let crc = 0 ^ (-1);
+                    for (let i = 0; i < dataBytes.length; i++) {
+                        crc = (crc >>> 8) ^ crcTable[(crc ^ dataBytes[i]) & 0xFF];
+                    }
+                    crc = (crc ^ (-1)) >>> 0;
+
+                    const size = dataBytes.length;
+                    
+                    const lfh = new Uint8Array(30 + nameBytes.length);
+                    lfh.set([0x50, 0x4b, 0x03, 0x04]); 
+                    lfh.set([10, 0], 4);               
+                    lfh.set([0x00, 0x08], 6);          
+                    lfh.set([0, 0], 8);                
+                    lfh.set([0, 0, 0, 0], 10);         
+                    lfh.set([crc & 0xFF, (crc >>> 8) & 0xFF, (crc >>> 16) & 0xFF, (crc >>> 24) & 0xFF], 14); 
+                    lfh.set([size & 0xFF, (size >>> 8) & 0xFF, (size >>> 16) & 0xFF, (size >>> 24) & 0xFF], 18); 
+                    lfh.set([size & 0xFF, (size >>> 8) & 0xFF, (size >>> 16) & 0xFF, (size >>> 24) & 0xFF], 22); 
+                    lfh.set([nameBytes.length & 0xFF, (nameBytes.length >>> 8) & 0xFF], 26); 
+                    lfh.set([0, 0], 28);               
+                    lfh.set(nameBytes, 30);            
+
+                    localHeaders.push(lfh, dataBytes);
+
+                    entries.push({
+                        nameBytes: nameBytes,
+                        crc: crc,
+                        size: size,
+                        offset: offset
+                    });
+
+                    offset += lfh.length + dataBytes.length;
                 }
 
-                const manifestObj = {
+                const cdOffset = offset;
+                let cdHeaders = [];
+
+                for (const entry of entries) {
+                    const cdh = new Uint8Array(46 + entry.nameBytes.length);
+                    cdh.set([0x50, 0x4b, 0x01, 0x02]); 
+                    cdh.set([20, 0], 4);               
+                    cdh.set([10, 0], 6);               
+                    cdh.set([0x00, 0x08], 8);          
+                    cdh.set([0, 0], 10);               
+                    cdh.set([0, 0, 0, 0], 12);         
+                    cdh.set([entry.crc & 0xFF, (entry.crc >>> 8) & 0xFF, (entry.crc >>> 16) & 0xFF, (entry.crc >>> 24) & 0xFF], 16);
+                    cdh.set([entry.size & 0xFF, (entry.size >>> 8) & 0xFF, (entry.size >>> 16) & 0xFF, (entry.size >>> 24) & 0xFF], 20);
+                    cdh.set([entry.size & 0xFF, (entry.size >>> 8) & 0xFF, (entry.size >>> 16) & 0xFF, (entry.size >>> 24) & 0xFF], 24);
+                    cdh.set([entry.nameBytes.length & 0xFF, (entry.nameBytes.length >>> 8) & 0xFF], 28);
+                    cdh.set([0, 0], 30);               
+                    cdh.set([0, 0], 32);               
+                    cdh.set([0, 0], 34);               
+                    cdh.set([0, 0], 36);               
+                    cdh.set([0, 0, 0, 0], 38);         
+                    cdh.set([entry.offset & 0xFF, (entry.offset >>> 8) & 0xFF, (entry.offset >>> 16) & 0xFF, (entry.offset >>> 24) & 0xFF], 42); 
+                    cdh.set(entry.nameBytes, 46);
+
+                    cdHeaders.push(cdh);
+                    offset += cdh.length;
+                }
+
+                const cdSize = offset - cdOffset;
+
+                const eocd = new Uint8Array(22);
+                eocd.set([0x50, 0x4b, 0x05, 0x06]); 
+                eocd.set([0, 0], 4);               
+                eocd.set([0, 0], 6);               
+                eocd.set([entries.length & 0xFF, (entries.length >>> 8) & 0xFF], 8);  
+                eocd.set([entries.length & 0xFF, (entries.length >>> 8) & 0xFF], 10); 
+                eocd.set([cdSize & 0xFF, (cdSize >>> 8) & 0xFF, (cdSize >>> 16) & 0xFF, (cdSize >>> 24) & 0xFF], 12); 
+                eocd.set([cdOffset & 0xFF, (cdOffset >>> 8) & 0xFF, (cdOffset >>> 16) & 0xFF, (cdOffset >>> 24) & 0xFF], 16); 
+                eocd.set([0, 0], 20);               
+
+                return new Blob([...localHeaders, ...cdHeaders, eocd], { type: 'application/zip' });
+            }
+
+            const crcTable = [];
+            for (let n = 0; n < 256; n++) {
+                let c = n;
+                for (let k = 0; k < 8; k++) {
+                    c = ((c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1));
+                }
+                crcTable[n] = c;
+            }
+
+            function createPreviewBox(title, content) {
+                const box = document.createElement('div');
+                box.className = 'preview-box';
+                
+                const header = document.createElement('div');
+                header.className = 'preview-title-area';
+                
+                const titleSpan = document.createElement('span');
+                titleSpan.className = 'preview-title';
+                titleSpan.textContent = title;
+                
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'copy-btn';
+                copyBtn.textContent = 'コピー';
+                
+                const textarea = document.createElement('textarea');
+                textarea.className = 'preview-textarea';
+                textarea.rows = 10;
+                textarea.value = content;
+                textarea.readOnly = true;
+
+                copyBtn.addEventListener('click', () => {
+                    textarea.select();
+                    navigator.clipboard.writeText(textarea.value);
+                    const originalText = copyBtn.textContent;
+                    copyBtn.textContent = 'コピー完了！';
+                    setTimeout(() => { copyBtn.textContent = originalText; }, 1500);
+                });
+
+                header.appendChild(titleSpan);
+                header.appendChild(copyBtn);
+                box.appendChild(header);
+                box.appendChild(textarea);
+                textPreviewsContainer.appendChild(box);
+            }
+
+            // メイン処理: ファイル生成ボタンイベント
+            generateBtn.addEventListener('click', async () => {
+                const appName = appNameInput.value.trim() || 'Tools PWA';
+                textPreviewsContainer.innerHTML = ''; 
+
+                const htmlItems = htmlFilesContainer.querySelectorAll('.html-file-item');
+                let fileList = ['/']; 
+                let rawHtmlFiles = [];
+
+                htmlItems.forEach(item => {
+                    let path = item.querySelector('.html-path-input').value.trim();
+                    if (!path) path = '/index.html';
+                    if (!path.startsWith('/')) path = '/' + path; // 安全のためスラッシュ補正
+
+                    let content = item.querySelector('.html-code-textarea').value.trim();
+                    if (!content) {
+                        content = `<!DOCTYPE html>\n<html lang="ja">\n<head>\n    <meta charset="UTF-8">\n    <title>${appName}</title>\n</head>\n<body>\n    <h1>${appName}</h1>\n</body>\n</html>`;
+                    }
+
+                    fileList.push(path);
+                    rawHtmlFiles.push({ path: path, rawContent: content });
+                });
+
+                // 重複排除してServiceWorkerのキャッシュインデックスにする
+                fileList = [...new Set(fileList)];
+
+                // 1. manifest.jsonデータのセットアップ
+                currentManifestObj = {
                     "short_name": appName,
                     "name": appName,
                     "icons": [
-                        {
-                            "src": iconName,
-                            "type": "image/png",
-                            "sizes": "192x192"
-                        },
-                        {
-                            "src": iconName,
-                            "type": "image/png",
-                            "sizes": "512x512"
-                        }
+                        { "src": "android-icon-192x192.png", "type": "image/png", "sizes": "192x192" },
+                        { "src": "android-icon-512x512.png", "type": "image/png", "sizes": "512x512" }
                     ],
                     "start_url": "/",
-                    "background_color": "#fafafa",
-                    "theme_color": "#000000",
+                    "background_color": "#121212",
+                    "theme_color": "#121212",
                     "display": "standalone",
                     "orientation": "portrait"
                 };
 
-                const swContent = `const CACHE_NAME = '${appName.toLowerCase().replace(/\s+/g, '-')}-cache-v1';
+                // 2. sw.jsのコンテンツ成形
+                currentSwContent = `const CACHE_NAME = '${appName.toLowerCase().replace(/\s+/g, '-')}-cache-v1';
 const ASSETS = ${JSON.stringify(fileList, null, 4)};
 
 self.addEventListener('install', (e) => {
@@ -185,16 +521,159 @@ self.addEventListener('fetch', (e) => {
     );
 });`;
 
+                // 3. 各種HTMLに埋め込むべき完全に定義されたメタタグと起動コード群
+                const pwaMetaTags = `
+    <link rel="apple-touch-icon" sizes="57x57" href="/apple-icon-57x57.png">
+    <link rel="apple-touch-icon" sizes="60x60" href="/apple-icon-60x60.png">
+    <link rel="apple-touch-icon" sizes="72x72" href="/apple-icon-72x72.png">
+    <link rel="apple-touch-icon" sizes="76x76" href="/apple-icon-76x76.png">
+    <link rel="apple-touch-icon" sizes="114x114" href="/apple-icon-114x114.png">
+    <link rel="apple-touch-icon" sizes="120x120" href="/apple-icon-120x120.png">
+    <link rel="apple-touch-icon" sizes="144x144" href="/apple-icon-144x144.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="/apple-icon-152x152.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-icon-180x180.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/android-icon-192x192.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="msapplication-TileColor" content="#121212">
+    <meta name="msapplication-TileImage" content="/ms-icon-144x144.png">
+    <meta name="theme-color" content="#121212">\n`;
+
+                const swRegisterScript = `\n    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('ServiceWorker registered', reg))
+                    .catch(err => console.error('ServiceWorker registration failed', err));
+            });
+        }
+    <\/script>\n`;
+
+                // 4. 各HTMLファイルを順次加工してプレビュー用・保存用に保持
+                currentProcessedHtmls = [];
+                
+                // 表示用テキストの初期化
+                createPreviewBox('manifest.json', JSON.stringify(currentManifestObj, null, 4));
+                createPreviewBox('sw.js', currentSwContent);
+
+                rawHtmlFiles.forEach(htmlFile => {
+                    let processed = htmlFile.rawContent;
+
+                    // </head> タグの手前にメタ情報を精密にインジェクション
+                    if (processed.toLowerCase().includes('</head>')) {
+                        processed = processed.replace(/<\/head>/i, `${pwaMetaTags}</head>`);
+                    } else {
+                        processed = pwaMetaTags + processed;
+                    }
+
+                    // </body> タグの手前に登録用スクリプトをインジェクション
+                    if (processed.toLowerCase().includes('</body>')) {
+                        processed = processed.replace(/<\/body>/i, `${swRegisterScript}</body>`);
+                    } else {
+                        processed = processed + swRegisterScript;
+                    }
+
+                    const safeName = htmlFile.path.startsWith('/') ? htmlFile.path.substring(1) : htmlFile.path;
+
+                    currentProcessedHtmls.push({
+                        path: htmlFile.path,
+                        safeName: safeName,
+                        content: processed
+                    });
+
+                    // 完全に情報が注入された状態のHTMLをプレビューエリアへ表示
+                    createPreviewBox(htmlFile.path, processed);
+                });
+
+                // 5. ディレクトリ構造のファイルツリー表示ロジック
+                let treeText = `📁 [Root Directory]\n`;
+                treeText += `├── 📄 manifest.json\n`;
+                treeText += `├── 📄 sw.js\n`;
+                
+                // HTMLファイルをツリーにマッピング
+                currentProcessedHtmls.forEach(file => {
+                    treeText += `├── 📄 ${file.safeName}\n`;
+                });
+
+                // アイコンの出力状況をツリーに反映
+                if (originalImageElement) {
+                    treeText += `├── 🖼️ android-icon-192x192.png\n`;
+                    treeText += `├── 🖼️ android-icon-512x512.png\n`;
+                    treeText += `├── 🖼️ apple-icon-57x57.png ... (他各解像度アイコン一式)\n`;
+                    treeText += `└── 🖼️ favicon-32x32.png 等`;
+                } else {
+                    treeText += `└── ⚠️ (アイコン未指定: デフォルトの参照パスが維持されます)`;
+                }
+                fileStructureTree.textContent = treeText;
+
+                // 各ダウンロードボタンのイベント割り当て
                 downloadManifestBtn.onclick = () => {
-                    downloadBlob(JSON.stringify(manifestObj, null, 4), 'manifest.json', 'application/json');
+                    downloadBlob(JSON.stringify(currentManifestObj, null, 4), 'manifest.json', 'application/json');
                 };
 
                 downloadSWBtn.onclick = () => {
-                    downloadBlob(swContent, 'sw.js', 'application/javascript');
+                    downloadBlob(currentSwContent, 'sw.js', 'application/javascript');
                 };
 
                 resultArea.classList.remove('hidden');
             });
+
+            // ZIP一括生成＆ダウンロード処理
+            downloadZipBtn.onclick = async () => {
+                if (!currentManifestObj) return;
+
+                const appName = appNameInput.value.trim() || 'Tools PWA';
+                
+                // ボタンを押すたびに新しい配列配列として初期化（重複詰め込みバグをガード）
+                let zipFiles = [
+                    { name: 'manifest.json', content: JSON.stringify(currentManifestObj, null, 4) },
+                    { name: 'sw.js', content: currentSwContent }
+                ];
+
+                // 加工済みHTMLを投入
+                currentProcessedHtmls.forEach(htmlFile => {
+                    zipFiles.push({ name: htmlFile.safeName, content: htmlFile.content });
+                });
+
+                // アイコンのリサイズバイナリ割り当て
+                if (originalImageElement) {
+                    const targetSizes = [
+                        { size: 57, name: 'apple-icon-57x57.png' },
+                        { size: 60, name: 'apple-icon-60x60.png' },
+                        { size: 72, name: 'apple-icon-72x72.png' },
+                        { size: 76, name: 'apple-icon-76x76.png' },
+                        { size: 114, name: 'apple-icon-114x114.png' },
+                        { size: 120, name: 'apple-icon-120x120.png' },
+                        { size: 144, name: 'apple-icon-144x144.png' },
+                        { size: 152, name: 'apple-icon-152x152.png' },
+                        { size: 180, name: 'apple-icon-180x180.png' },
+                        { size: 192, name: 'android-icon-192x192.png' },
+                        { size: 512, name: 'android-icon-512x512.png' },
+                        { size: 32, name: 'favicon-32x32.png' },
+                        { size: 96, name: 'favicon-96x96.png' },
+                        { size: 16, name: 'favicon-16x16.png' },
+                        { size: 144, name: 'ms-icon-144x144.png' }
+                    ];
+
+                    for (const target of targetSizes) {
+                        const iconBlob = await resizeIcon(originalImageElement, target.size);
+                        if (iconBlob) {
+                            zipFiles.push({ name: target.name, content: iconBlob });
+                        }
+                    }
+                }
+
+                const zipBlob = await createZip(zipFiles);
+                
+                const url = URL.createObjectURL(zipBlob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${appName.toLowerCase().replace(/\s+/g, '-')}-pwa.zip`;
+                a.click();
+                URL.revokeObjectURL(url);
+            };
         });
     </script>
 </body>
