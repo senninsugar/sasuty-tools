@@ -33,15 +33,15 @@
     <iframe id="embed-frame"></iframe>
     
     <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
-    <script src="uv/uv.bundle.js"></script>
-    <script src="uv/uv.config.js"></script>
+    <script src="tools/proxy/sasutyproxy/uv/uv.bundle.js"></script>
+    <script src="tools/proxy/sasutyproxy/uv/uv.config.js"></script>
     <script type="module">
-        import { registerSW } from "/prxy/register-sw.mjs";
-        import * as BareMux from "/prxy/baremux/index.mjs";
+        import { registerSW } from "/tools/proxy/sasutyproxy/register-sw.mjs";
+        import * as BareMux from "/tools/proxy/sasutyproxy/baremux/index.mjs";
 
         particlesJS('particles-js', { particles: { number: { value: 30 }, color: { value: '#6366f1' }, line_linked: { enable: true, opacity: 0.1 } } });
 
-        const connection = new BareMux.BareMuxConnection("/prxy/baremux/worker.js");
+        const connection = new BareMux.BareMuxConnection("/tools/proxy/sasutyproxy/baremux/worker.js");
         const wispServers = ["wss://wisp.rhw.one/", "wss://anura.pro/", "wss://phantom.lol/wisp/", "wss://wisp.mercurywork.shop/", "wss://shadow-3.swanndvr.net/wisp/", "wss://shadow.curesoutpost.com/wisp/", "wss://wisp.43059.lrga.space/", "wss://wisp.lrga.space/", "wss://wisp.artclass-eta.vercel.app", "wss://wisp.gointerstellar.app/", "wss://wisp.webmc.fun/", "wss://construction.services.codd70.ru/socket/", "wss://tomp.app/wisp/"];
 
         let activeWispUrl = null;
@@ -72,8 +72,8 @@
         async function getUV(input) {
             await registerSW();
             const wispUrl = await getAvailableWisp();
-            if ((await connection.getTransport()) !== "/prxy/epoxy/index.mjs") {
-                await connection.setTransport("/prxy/epoxy/index.mjs", [{ wisp: wispUrl }]);
+            if ((await connection.getTransport()) !== "/tools/proxy/sasutyproxy/epoxy/index.mjs") {
+                await connection.setTransport("/tools/proxy/sasutyproxy/epoxy/index.mjs", [{ wisp: wispUrl }]);
             }
             return __uv$config.prefix + __uv$config.encodeUrl(search(input));
         }
