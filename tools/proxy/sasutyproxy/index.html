@@ -228,7 +228,7 @@
             } else {
                 if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
             }
-            return window.location.origin + '/tools/proxy/sasutyproxy/' + encodeURIComponent(url);
+            return window.location.origin + '/tools/proxy/sasutyproxy/embed.html#' + encodeURIComponent(url);
         }
 
         function addNewTab() {
